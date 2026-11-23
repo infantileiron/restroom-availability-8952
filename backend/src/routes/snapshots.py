@@ -5,7 +5,7 @@ from src.constants.business import Role, Status
 from src.controllers.identity import current_user, require
 from src.schemas.snapshots import SnapshotInput
 from src.services import snapshots
-from src.services.exports import export_path
+from src.services.exports import export_path, window_export_path
 
 router = APIRouter(prefix='/snapshots', tags=['snapshots'])
 
@@ -44,3 +44,17 @@ def export(snapshot_id: int, user=Depends(current_user)):
     if not path.is_file():
         raise HTTPException(503, '暂时无法读取导出文件')
     return FileResponse(path, media_type='text/csv; charset=utf-8', filename=f"开放时段-{snapshot['month']}-V{snapshot_id}.csv")
+
+
+@router.get('/{snapshot_id}/window-export')
+def window_export(snapshot_id: int, user=Depends(current_user)):
+    snapshot = snapshots.detail(snapshot_id, user)
+    if snapshot['status'] not in (Status.READY, Status.PUBLISHED):
+        raise HTTPException(409, '请先完成核算')
+    if not snapshot['result'] or not snapshot['result'].get('rule_version'):
+        raise HTTPException(409, '该版本没有节庆临时窗口，无窗口裁决导出')
+    path = window_export_path(snapshot_id)
+    if not path.is_file():
+        raise HTTPException(503, '暂时无法读取窗口裁决文件')
+    return FileResponse(path, media_type='text/csv; charset=utf-8',
+                        filename=f"节庆窗口裁决-{snapshot['month']}-V{snapshot_id}.csv")

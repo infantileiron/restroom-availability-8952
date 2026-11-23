@@ -2,6 +2,7 @@ import {api} from './api/client.js';
 import {shell} from './components/shell.js';
 import {blank} from './components/common/heading.js';
 import {calendarPage} from './pages/calendar.js';
+import {festivalPage} from './pages/festival.js';
 import {login} from './pages/login.js';
 import {outagesPage} from './pages/outages.js';
 import {detailPage} from './pages/snapshot-detail.js';
@@ -28,6 +29,7 @@ async function render() {
   view.innerHTML = '<p class="loading">正在加载工作记录…</p>';
   try {
     if (section === 'calendar') await calendarPage(context);
+    else if (section === 'festival') await festivalPage(context);
     else if (section === 'outages') await outagesPage(context);
     else if (id) await detailPage(context, section, id);
     else await snapshotsPage(context, section === 'reports');

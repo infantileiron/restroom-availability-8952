@@ -216,6 +216,15 @@ fieldset { margin: 0; padding: 9px; border: 1px solid var(--line); }
 .toast { position: fixed; bottom: 22px; right: 22px; z-index: 3; display: grid; max-width: calc(100% - 44px); border: 1px solid var(--line); border-left: 4px solid var(--open); background: var(--sheet); padding: 10px 15px; border-radius: 3px; }
 .toast.is-error { border-left-color: var(--loss); color: var(--orange); }
 
+.selected-row { background: var(--mark); }
+.detail-sheet { margin-top: 16px; }
+.detail-sheet .table-heading { align-items: flex-start; }
+.detail-sheet h2 small { display: inline; margin-left: 6px; }
+.conflict-box { margin: 12px 19px 16px; border: 1px solid var(--line); border-left: 4px solid var(--loss); border-radius: 3px; padding: 10px 0 4px; background: var(--paper); }
+.conflict-box h3 { margin: 0 13px 8px; font-size: 14px; }
+.rule-block { margin-bottom: 13px; }
+.rule-block code { font-size: .85em; }
+
 @media (max-width: 1279px) {
   .workspace { grid-template-columns: 188px minmax(0, 1fr); }
   .calendar-grid { grid-template-columns: minmax(160px, 24%) minmax(0, 1fr); }

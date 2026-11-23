@@ -1,4 +1,4 @@
-const pattern = /^(calendar|outages|runs|reports)(?:\/(\d+))?$/;
+const pattern = /^(calendar|festival|outages|runs|reports)(?:\/(\d+))?$/;
 
 export function route(role) {
   const match = location.hash.slice(1).match(pattern);

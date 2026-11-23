@@ -8,7 +8,7 @@ from scripts.seed_demo import seed
 from src.config.runtime import REDIS, SEED_DEMO
 from src.middlewares.http import install
 from src.models.database import connect, migrate
-from src.routes import calendar, identity, snapshots
+from src.routes import calendar, identity, rule_versions, snapshots
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app = FastAPI(title='坊洁巡维', lifespan=lifecycle)
 install(app)
 app.include_router(identity.router)
 app.include_router(calendar.router)
+app.include_router(rule_versions.router)
 app.include_router(snapshots.router)
 
 

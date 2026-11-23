@@ -7,3 +7,4 @@ export const clock = minute => {
   const two = value => String(value).padStart(2, '0');
   return `${minute >= 1440 ? '次日 ' : ''}${two(Math.floor(base / 60))}:${two(base % 60)}`;
 };
+export const clockRange = (start, end) => `${clock(start)}–${clock(end)}`;

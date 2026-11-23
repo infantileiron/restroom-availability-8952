@@ -11,4 +11,13 @@ export const workspace = {
   capture: input => api('/snapshots', input),
   run: id => api(`/snapshots/${id}/run`, {}),
   publish: id => api(`/snapshots/${id}/publish`, {}),
+
+  ruleVersions: () => api('/rule-versions'),
+  ruleVersion: id => api(`/rule-versions/${id}`),
+  rulePreview: id => api(`/rule-versions/${id}/preview`),
+  createRuleVersion: input => api('/rule-versions', input),
+  activateRuleVersion: id => api(`/rule-versions/${id}/activate`, {}),
+  addTempWindow: (id, input) => api(`/rule-versions/${id}/windows`, input),
+  removeTempWindow: (versionId, windowId) =>
+    api(`/rule-versions/${versionId}/windows/${windowId}`, undefined, false, 'DELETE'),
 };

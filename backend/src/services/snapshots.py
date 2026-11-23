@@ -9,6 +9,7 @@ from redis.exceptions import RedisError
 from src.config.runtime import REDIS, WAKE_QUEUE
 from src.constants.business import Role, Status
 from src.models import calendar
+from src.models import rule_versions as rule_store
 from src.models.audit import audit
 from src.models.database import connect
 from src.models.snapshots import SUMMARY, find, listing
@@ -25,8 +26,16 @@ def capture(payload, actor):
             for field in ('starts_at', 'ends_at'):
                 event[field] = event[field].isoformat(timespec='minutes')
         inputs = {'month': payload.month, 'facilities': calendar.facilities(db), 'outages': events}
+        # 冻结当前生效的节庆规则版本；已冻结快照此后不受规则变更影响。
+        active = rule_store.active_version(db)
+        if active and active['adjudication'] is not None:
+            inputs['rule_version'] = {
+                'id': active['id'], 'label': active['label'], 'status': active['status'],
+                'adjudication_mode': active['adjudication_mode'], 'checksum': active['checksum'],
+                'adjudication': active['adjudication'],
+            }
         canonical = json.dumps(inputs, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
-        digest = hashlib.sha256(canonical).hexdigest()
+        digest = hashlib.sh256(canonical).hexdigest()
         inserted = db.execute(f'''INSERT INTO snapshots (month, label, inputs, checksum, created_by)
                                   VALUES (%s, %s, %s, %s, %s) RETURNING {SUMMARY}''',
                               (payload.month, payload.label, Jsonb(inputs), digest, actor)).fetchone()

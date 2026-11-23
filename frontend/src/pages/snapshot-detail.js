@@ -1,4 +1,5 @@
 import {download} from '../api/client.js';
+import {ADJUDICATION_MODES, RULE_SOURCES, WINDOW_TYPES} from '../constants/business.js';
 import {blank, heading} from '../components/common/heading.js';
 import {notify} from '../components/common/notifications.js';
 import {state} from '../components/common/status.js';
@@ -6,7 +7,31 @@ import {timeAxis, track} from '../components/common/timeline.js';
 import {bindAction, pollWhileActive} from '../hooks/refresh.js';
 import {workspace} from '../stores/workspace.js';
 import {esc} from '../utils/html.js';
-import {number, percent} from '../utils/format.js';
+import {number, percent, clockRange} from '../utils/format.js';
+
+function downloadWindow(snapshot) {
+  return download(snapshot, 'window-export', `节庆窗口裁决-${snapshot.month}-V${snapshot.id}.csv`);
+}
+
+function ruleVersionBlock(rule) {
+  const conflicts = rule.conflicts || [];
+  return `<section class="sheet rule-block"><div class="table-heading"><div><h2>节庆临时窗口采用情况</h2>
+      <p>规则版本 V${rule.id} · ${esc(rule.label)} · ${ADJUDICATION_MODES[rule.adjudication_mode] || rule.adjudication_mode}
+      · 校验 <code class="mono">${esc(rule.checksum.slice(0, 16))}</code></p></div></div>
+    <div class="scroll-table"><table><thead><tr><th>设施</th><th>开门日</th><th>采用窗口</th><th>类型</th><th>来源</th><th>实际起止（裁到本月）</th></tr></thead><tbody>
+    ${rule.window_adoption.map(item => `<tr><th scope="row">${esc(item.facility_name)}<small class="mono">${esc(item.facility_code)}</small></th>
+      <td class="mono">${esc(item.open_date)}</td><td class="mono nowrap">${clockRange(item.start_min, item.end_min)}</td>
+      <td>${WINDOW_TYPES[item.window_type] || item.window_type}</td><td>${RULE_SOURCES[item.source] || item.source}</td>
+      <td class="mono nowrap">${esc(item.starts_at.replace('T', ' '))} → ${esc(item.ends_at.replace('T', ' '))}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${conflicts.length ? `<div class="conflict-box"><h3>裁决结果（${conflicts.length} 组冲突）</h3>
+      <div class="scroll-table"><table><thead><tr><th>设施</th><th>开门日</th><th>采用记录</th><th>被覆盖记录</th><th>说明</th></tr></thead><tbody>
+      ${conflicts.map(c => `<tr><td class="mono">${esc(c.facility_code)}</td><td class="mono">${esc(c.open_date)}</td>
+        <td class="mono">${c.winning_record_ids.join('、')}${c.winning_source ? `（${RULE_SOURCES[c.winning_source]}）` : ''}</td>
+        <td class="mono">${(c.overridden_record_ids || []).join('、') || '—'}</td><td>${esc(c.reason)}</td></tr>`).join('')}
+      </tbody></table></div></div>` : '<p class="field-note" style="padding:0 19px 12px">本版本各窗口无相互冲突。</p>'}
+    </section>`;
+}
 
 function timeline(result) {
   const days = Object.keys(result.facilities[0]?.daily || {});
@@ -31,6 +56,7 @@ function resultBody(result) {
     <dl class="result-metrics"><div><dt>计划开放</dt><dd>${number(totals.planned_minutes)} <small>分钟</small></dd></div>
     <div><dt>有效停用</dt><dd class="orange">${number(totals.lost_minutes)} <small>分钟</small></dd></div>
     <div><dt>实际可用</dt><dd>${number(totals.available_minutes)} <small>分钟</small></dd></div></dl></div>
+    ${result.rule_version ? ruleVersionBlock(result.rule_version) : ''}
     ${timeline(result)}
     <section class="sheet result-table"><div class="table-heading"><div><h2>设施月度明细</h2><p>分钟加权 · 单位为分钟</p></div></div>
     <div class="scroll-table"><table><thead><tr><th>设施</th><th>计划开放</th><th>有效停用</th><th>实际可用</th><th>闭馆停用</th><th>可用率</th></tr></thead>
@@ -58,7 +84,8 @@ export async function detailPage({view, user, active, refresh}, section, id) {
     const run = user.role === 'analyst' && ['draft', 'failed'].includes(row.status);
     const review = user.role === 'reviewer' && row.status === 'ready';
     const actions = [run && '<button class="primary" id="run">执行核算</button>',
-      row.result && '<button class="secondary" id="export">导出 CSV</button>',
+      row.result && '<button class="secondary" id="export">导出核算 CSV</button>',
+      row.result?.rule_version && '<button class="secondary" id="window-export">导出窗口裁决 CSV</button>',
       review && '<button class="primary" id="publish">发布月报</button>'].filter(Boolean).join('');
     view.innerHTML = `<a class="back-link" href="#${section}">← ${section === 'reports' ? '月报清单' : '口径快照'}</a>` +
       heading(row.label, `${row.month} 月度核算 · 版本 V${row.id}`, actions) +
@@ -73,6 +100,7 @@ export async function detailPage({view, user, active, refresh}, section, id) {
     bindAction(view.querySelector('#run'), async () => { await workspace.run(id); refresh(); }, fail);
     bindAction(view.querySelector('#publish'), async () => { await workspace.publish(id); notify('月报已发布'); refresh(); }, fail);
     bindAction(view.querySelector('#export'), () => download(row), fail);
+    bindAction(view.querySelector('#window-export'), () => downloadWindow(row), fail);
   };
   const row = await workspace.snapshot(id);
   if (!active()) return;
