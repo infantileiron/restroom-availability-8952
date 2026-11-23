@@ -1,0 +1,81 @@
+name: restroom-availability
+x-app: &app
+  build: ./backend
+  image: ${COMPOSE_PROJECT_NAME:-restroom-availability}-app:local
+  environment:
+    PGHOST: db
+    PGDATABASE: ${POSTGRES_DB:-restrooms}
+    PGUSER: ${POSTGRES_USER:-restrooms}
+    PGPASSWORD: ${POSTGRES_PASSWORD:-restrooms-local}
+    REDIS_URL: redis://redis:6379/0
+    JWT_SECRET: ${JWT_SECRET:-local-restroom-demo-key-replace-before-deploy}
+    SEED_DEMO: ${SEED_DEMO:-true}
+    ARTIFACT_DIR: /artifacts
+    TZ: Asia/Shanghai
+  volumes:
+    - reports:/artifacts
+  depends_on:
+    db: {condition: service_healthy}
+    redis: {condition: service_healthy}
+services:
+  frontend:
+    build: ./frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-restroom-availability}-frontend
+    ports: ["127.0.0.1:${FRONTEND_PORT:-18280}:80"]
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1/api/health']
+      interval: 3s
+      timeout: 2s
+      retries: 15
+  backend:
+    <<: *app
+    container_name: ${COMPOSE_PROJECT_NAME:-restroom-availability}-backend
+    ports: ["127.0.0.1:${BACKEND_PORT:-19280}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+  worker:
+    <<: *app
+    container_name: ${COMPOSE_PROJECT_NAME:-restroom-availability}-worker
+    command: [python, -m, src.worker]
+    healthcheck:
+      test: [CMD, python, -c, "import time, pathlib; assert time.time() - pathlib.Path('/tmp/heartbeat').stat().st_mtime < 18"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+  db:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-restroom-availability}-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restrooms}
+      POSTGRES_USER: ${POSTGRES_USER:-restrooms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-restrooms-local}
+    ports: ["127.0.0.1:${DB_PORT:-17780}:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-restroom-availability}-redis
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+volumes:
+  postgres-data:
+  redis-data:
+  reports:
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET:-10.221.211.0/24}
